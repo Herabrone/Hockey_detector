@@ -33,6 +33,18 @@ pip install -r requirements.txt
 python -m app.main --config config/config.yaml
 ```
 
+## Test with Game1.mp4
+```powershell
+python -m app.main --config config/test_game.yaml
+```
+
+If `assets/goal_template.png` exists, the app will print lines like:
+```text
+[GOAL] team=unknown score=0.842 | 14:32:07
+```
+
+If you add optional team templates in `config/test_game.yaml`, the `team=` value will use the best matching team tag.
+
 ## Capture template
 1. Set `video_source` and `roi` in `config/config.yaml`.
 2. Run:
@@ -45,3 +57,5 @@ python -m scripts.capture_template --config config/config.yaml --output assets/g
 - For recorded-video tuning, set `video_source` to a file path.
 - For live capture card, set `video_source` to camera index string such as `"0"`.
 - Keep `relay_mode: print` until relay hardware is connected.
+- `config/test_game.yaml` is preconfigured to use `assets/Game1.mp4`.
+- Team detection is optional and uses the `team_templates` mapping in config.
