@@ -6,6 +6,7 @@ cooldown_seconds: 10.0
 show_window: true
 show_roi_box: true
 template_path: assets/goal_template.png
+sensitivity: balanced  # fast, balanced, accurate
 
 relay_mode: print
 serial_port: COM3
@@ -17,3 +18,13 @@ roi:
   y2: 150
   x1: 0
   x2: -1
+
+audio:
+  enabled: true
+  horn_freq_low: 200
+  horn_freq_high: 1000
+  horn_energy_threshold: 0.4
+  horn_sustain_seconds: 1.0
+  sample_rate: 16000
+  chunk_duration: 0.5
+  vosk_model_path: ""  # path to vosk model dir for keyword detection (leave empty to skip)

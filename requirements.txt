@@ -1,4 +1,7 @@
 opencv-python>=4.10.0
+numpy>=1.26.0
 PyYAML>=6.0.2
 pyserial>=3.5
 pytest>=8.3.0
+# Optional: pip install sounddevice  (live microphone capture)
+# Optional: pip install vosk          (announcer keyword detection)
