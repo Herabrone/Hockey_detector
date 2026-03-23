@@ -40,7 +40,7 @@ def run(cfg: AppConfig) -> None:
     detector = None
     template_path = Path(cfg.template_path)
     if template_path.exists():
-        detector = GoalTemplateDetector(str(template_path))
+        detector = GoalTemplateDetector(str(template_path), cfg.team_templates)
     else:
         print(f"Template missing: {template_path}. Detection is disabled.")
 
@@ -61,10 +61,12 @@ def run(cfg: AppConfig) -> None:
             roi = frame[y1:y2, x1:x2]
 
             score = 0.0
+            team_name = "unknown"
             if detector is not None:
                 score = detector.score(roi)
                 if score >= cfg.threshold and gate.can_trigger():
-                    print(f"GOAL DETECTED score={score:.3f} at {time.strftime('%H:%M:%S')}")
+                    team_name = detector.detect_team(roi)
+                    print(f"[GOAL] team={team_name} score={score:.3f} | {time.strftime('%H:%M:%S')}")
                     relay.trigger()
                     gate.mark_triggered()
 
@@ -74,7 +76,7 @@ def run(cfg: AppConfig) -> None:
                     cv2.rectangle(display, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 cv2.putText(
                     display,
-                    f"score={score:.3f} threshold={cfg.threshold:.2f}",
+                    f"score={score:.3f} threshold={cfg.threshold:.2f} team={team_name}",
                     (10, cfg.output_height - 10),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,

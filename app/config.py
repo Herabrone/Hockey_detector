@@ -29,6 +29,7 @@ class AppConfig:
     serial_port: str = "COM3"
     serial_baudrate: int = 9600
     serial_command: str = "ON\\n"
+    team_templates: dict[str, str] = field(default_factory=dict)
     roi: ROIConfig = field(default_factory=ROIConfig)
 
 
@@ -55,12 +56,17 @@ def load_config(path: str | Path) -> AppConfig:
         raw = yaml.safe_load(f) or {}
 
     roi_raw = raw.get("roi", {}) if isinstance(raw, dict) else {}
+    team_templates_raw = raw.get("team_templates", {}) if isinstance(raw, dict) else {}
     roi = ROIConfig(
         y1=_as_int(roi_raw.get("y1"), 0),
         y2=_as_int(roi_raw.get("y2"), 150),
         x1=_as_int(roi_raw.get("x1"), 0),
         x2=_as_int(roi_raw.get("x2"), -1),
     )
+    team_templates = {
+        str(name): str(template_path)
+        for name, template_path in team_templates_raw.items()
+    } if isinstance(team_templates_raw, dict) else {}
 
     cfg = AppConfig(
         video_source=str(raw.get("video_source", "0")),
@@ -75,6 +81,7 @@ def load_config(path: str | Path) -> AppConfig:
         serial_port=str(raw.get("serial_port", "COM3")),
         serial_baudrate=_as_int(raw.get("serial_baudrate"), 9600),
         serial_command=str(raw.get("serial_command", "ON\\n")),
+        team_templates=team_templates,
         roi=roi,
     )
 
