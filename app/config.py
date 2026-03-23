@@ -8,6 +8,18 @@ import yaml
 
 
 @dataclass
+class AudioConfig:
+    enabled: bool = False
+    horn_freq_low: int = 200
+    horn_freq_high: int = 1000
+    horn_energy_threshold: float = 0.4
+    horn_sustain_seconds: float = 1.0
+    sample_rate: int = 16000
+    chunk_duration: float = 0.5
+    vosk_model_path: str = ""  # empty = keyword detection disabled
+
+
+@dataclass
 class ROIConfig:
     y1: int = 0
     y2: int = 150
@@ -29,8 +41,10 @@ class AppConfig:
     serial_port: str = "COM3"
     serial_baudrate: int = 9600
     serial_command: str = "ON\\n"
+    sensitivity: str = "balanced"  # fast, balanced, accurate
     team_templates: dict[str, str] = field(default_factory=dict)
     roi: ROIConfig = field(default_factory=ROIConfig)
+    audio: AudioConfig = field(default_factory=AudioConfig)
 
 
 def _as_int(value: Any, default: int) -> int:
@@ -57,6 +71,7 @@ def load_config(path: str | Path) -> AppConfig:
 
     roi_raw = raw.get("roi", {}) if isinstance(raw, dict) else {}
     team_templates_raw = raw.get("team_templates", {}) if isinstance(raw, dict) else {}
+    audio_raw = raw.get("audio", {}) if isinstance(raw, dict) else {}
     roi = ROIConfig(
         y1=_as_int(roi_raw.get("y1"), 0),
         y2=_as_int(roi_raw.get("y2"), 150),
@@ -67,6 +82,17 @@ def load_config(path: str | Path) -> AppConfig:
         str(name): str(template_path)
         for name, template_path in team_templates_raw.items()
     } if isinstance(team_templates_raw, dict) else {}
+
+    audio = AudioConfig(
+        enabled=bool(audio_raw.get("enabled", False)),
+        horn_freq_low=_as_int(audio_raw.get("horn_freq_low"), 200),
+        horn_freq_high=_as_int(audio_raw.get("horn_freq_high"), 1000),
+        horn_energy_threshold=_as_float(audio_raw.get("horn_energy_threshold"), 0.4),
+        horn_sustain_seconds=_as_float(audio_raw.get("horn_sustain_seconds"), 1.0),
+        sample_rate=_as_int(audio_raw.get("sample_rate"), 16000),
+        chunk_duration=_as_float(audio_raw.get("chunk_duration"), 0.5),
+        vosk_model_path=str(audio_raw.get("vosk_model_path", "")),
+    )
 
     cfg = AppConfig(
         video_source=str(raw.get("video_source", "0")),
@@ -81,8 +107,10 @@ def load_config(path: str | Path) -> AppConfig:
         serial_port=str(raw.get("serial_port", "COM3")),
         serial_baudrate=_as_int(raw.get("serial_baudrate"), 9600),
         serial_command=str(raw.get("serial_command", "ON\\n")),
+        sensitivity=str(raw.get("sensitivity", "balanced")),
         team_templates=team_templates,
         roi=roi,
+        audio=audio,
     )
 
     return cfg
