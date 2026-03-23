@@ -10,6 +10,8 @@ import yaml
 @dataclass
 class AudioConfig:
     enabled: bool = False
+    source: str = ""  # empty = reuse video_source
+    input_format: str = ""  # e.g. dshow for Windows capture devices
     horn_freq_low: int = 200
     horn_freq_high: int = 1000
     horn_energy_threshold: float = 0.4
@@ -85,6 +87,8 @@ def load_config(path: str | Path) -> AppConfig:
 
     audio = AudioConfig(
         enabled=bool(audio_raw.get("enabled", False)),
+        source=str(audio_raw.get("source", "")),
+        input_format=str(audio_raw.get("input_format", "")),
         horn_freq_low=_as_int(audio_raw.get("horn_freq_low"), 200),
         horn_freq_high=_as_int(audio_raw.get("horn_freq_high"), 1000),
         horn_energy_threshold=_as_float(audio_raw.get("horn_energy_threshold"), 0.4),

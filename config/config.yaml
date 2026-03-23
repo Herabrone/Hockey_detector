@@ -21,6 +21,8 @@ roi:
 
 audio:
   enabled: true
+  source: ""  # empty uses video_source; set for stream/capture-device audio input
+  input_format: ""  # e.g. dshow on Windows when source is a device name
   horn_freq_low: 200
   horn_freq_high: 1000
   horn_energy_threshold: 0.4

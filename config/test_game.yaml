@@ -25,6 +25,8 @@ roi:
 
 audio:
   enabled: true
+  source: ""
+  input_format: ""
   horn_freq_low: 200
   horn_freq_high: 1000
   horn_energy_threshold: 0.4

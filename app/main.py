@@ -55,9 +55,10 @@ def _setup_audio(cfg: AppConfig):
     )
 
     audio = AudioStream(
-        source=cfg.video_source,
+        source=cfg.audio.source or cfg.video_source,
         sample_rate=cfg.audio.sample_rate,
         chunk_duration=cfg.audio.chunk_duration,
+        input_format=cfg.audio.input_format or None,
     )
     audio.register(horn)
 
