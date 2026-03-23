@@ -22,7 +22,10 @@ class GoalTemplateDetector:
     def _load_team_templates(self, team_templates: dict[str, str]) -> dict[str, np.ndarray]:
         loaded_templates: dict[str, np.ndarray] = {}
         for team_name, template_path in team_templates.items():
-            template = cv2.imread(str(Path(template_path)), cv2.IMREAD_GRAYSCALE)
+            path = Path(template_path)
+            if not path.exists():
+                continue
+            template = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
             if template is None:
                 continue
             loaded_templates[team_name] = template
