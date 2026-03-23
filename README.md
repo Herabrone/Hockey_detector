@@ -33,9 +33,25 @@ pip install -r requirements.txt
 python -m app.main --config config/config.yaml
 ```
 
+You can override the input source at launch time without editing config:
+```powershell
+python -m app.main --config config/config.yaml --video-source 0
+python -m app.main --config config/config.yaml --video-source assets/Game1.mp4
+```
+
+If you only want terminal output and no preview window:
+```powershell
+python -m app.main --config config/config.yaml --video-source assets/Game1.mp4 --no-window
+```
+
 ## Test with Game1.mp4
 ```powershell
 python -m app.main --config config/test_game.yaml
+```
+
+You can also run the same file test without the test config:
+```powershell
+python -m app.main --config config/config.yaml --video-source assets/Game1.mp4
 ```
 
 If `assets/goal_template.png` exists, the app will print lines like:
@@ -56,6 +72,8 @@ python -m scripts.capture_template --config config/config.yaml --output assets/g
 ## Notes
 - For recorded-video tuning, set `video_source` to a file path.
 - For live capture card, set `video_source` to camera index string such as `"0"`.
+- `--video-source` overrides the config file at runtime.
+- Use `--no-window` when you want console-only testing.
 - Keep `relay_mode: print` until relay hardware is connected.
 - `config/test_game.yaml` is preconfigured to use `assets/Game1.mp4`.
 - Team detection is optional and uses the `team_templates` mapping in config.

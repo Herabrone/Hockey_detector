@@ -97,12 +97,28 @@ def run(cfg: AppConfig) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="NHL goal overlay detector MVP")
     parser.add_argument("--config", default="config/config.yaml", help="Path to config yaml")
+    parser.add_argument(
+        "--video-source",
+        help="Camera index such as 0 or a path to a video file such as assets/Game1.mp4",
+    )
+    parser.add_argument(
+        "--no-window",
+        action="store_true",
+        help="Disable the OpenCV preview window and only print detections",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     cfg = load_config(args.config)
+
+    if args.video_source is not None:
+        cfg.video_source = str(args.video_source)
+
+    if args.no_window:
+        cfg.show_window = False
+
     run(cfg)
 
 
