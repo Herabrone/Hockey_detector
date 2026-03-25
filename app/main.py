@@ -13,6 +13,9 @@ from app.gate import CooldownGate
 from app.relay import PrintRelay, UsbSerialRelay
 from app.video_source import VideoSource
 
+_AUDIO_STARTUP_WARNING_SECONDS = 5.0
+_AUDIO_STALL_WARNING_SECONDS = 5.0
+
 
 def _build_relay(cfg: AppConfig):
     if cfg.relay_mode == "usb_serial":
@@ -33,7 +36,7 @@ def _compute_roi(frame, cfg: AppConfig):
     return x1, y1, x2, y2
 
 
-def _setup_audio(cfg: AppConfig):
+def _setup_audio(cfg: AppConfig, video_position_callback=None):
     """Initialise audio stream, horn detector, and keyword detector.
 
     Returns (audio_stream, horn_detector, keyword_detector).
@@ -56,6 +59,8 @@ def _setup_audio(cfg: AppConfig):
         freq_low=cfg.audio.horn_freq_low,
         freq_high=cfg.audio.horn_freq_high,
         energy_threshold=cfg.audio.horn_energy_threshold,
+        reference_clip_path=cfg.audio.horn_reference_path,
+        reference_similarity_threshold=cfg.audio.horn_reference_threshold,
         sustain_seconds=cfg.audio.horn_sustain_seconds,
         chunk_duration=cfg.audio.chunk_duration,
         max_history=None if preserve_audio_history else 120,
@@ -66,6 +71,7 @@ def _setup_audio(cfg: AppConfig):
         sample_rate=cfg.audio.sample_rate,
         chunk_duration=cfg.audio.chunk_duration,
         input_format=cfg.audio.input_format or None,
+        video_position_callback=video_position_callback,
     )
     audio.register(horn)
 
@@ -104,14 +110,20 @@ def run(cfg: AppConfig) -> None:
     else:
         print(f"Template missing: {template_path}. Visual detection disabled.")
 
-    audio, horn, keyword = _setup_audio(cfg)
+    audio, horn, keyword = _setup_audio(cfg, video_position_callback=source.timestamp)
 
     fusion = SignalFusion(cfg.sensitivity)
     gate = CooldownGate(cfg.cooldown_seconds)
     relay = _build_relay(cfg)
 
-    print(f"Sensitivity: {cfg.sensitivity} | Audio: {'on' if (audio and audio.active) else 'off'}")
+    audio_status = "off"
+    if audio and not audio.had_output:
+        audio_status = "starting"
+    elif audio and audio.had_output:
+        audio_status = "on"
+    print(f"Sensitivity: {cfg.sensitivity} | Audio: {audio_status}")
     print("Press ESC or q to quit.")
+    warned_horn_unavailable = False
 
     try:
         while True:
@@ -126,13 +138,35 @@ def run(cfg: AppConfig) -> None:
 
             video_ts = source.timestamp()
             audio_on = bool(audio and (audio.active or (audio.is_file_source and audio.had_output)))
+            keyword_available = bool(keyword and keyword.available)
+
+            if audio:
+                if audio.active and not audio.had_output and audio.seconds_since_start() > _AUDIO_STARTUP_WARNING_SECONDS:
+                    if not audio._warned_no_output:
+                        print("Warning: audio stream is active but has not produced any samples yet.")
+                        audio._warned_no_output = True
+                if audio.is_stalled(_AUDIO_STALL_WARNING_SECONDS) and not audio._warned_stalled:
+                    print("Warning: audio stream appears stalled; no recent samples received.")
+                    audio._warned_stalled = True
+
+            if audio_on and horn is None and not warned_horn_unavailable:
+                print("Warning: audio is available but horn detection is unavailable.")
+                warned_horn_unavailable = True
 
             visual_score = detector.score(roi) if detector else 0.0
             horn_conf = horn.confidence_at(video_ts) if horn else 0.0
             kw_hit = keyword.detected_at(video_ts) if keyword else False
 
             team_name = "unknown"
-            if fusion.should_trigger(visual_score, cfg.threshold, horn_conf, kw_hit, audio_on):
+            if fusion.should_trigger(
+                visual_score,
+                cfg.threshold,
+                horn_conf,
+                kw_hit,
+                audio_on,
+                keyword_available=keyword_available,
+                require_horn_and_keyword=cfg.require_horn_and_keyword,
+            ):
                 if gate.can_trigger():
                     if detector is not None:
                         team_name = detector.detect_team(roi)

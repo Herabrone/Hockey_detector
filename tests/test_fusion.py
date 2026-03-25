@@ -33,6 +33,21 @@ def test_balanced_does_not_trigger_on_horn_alone() -> None:
     assert not f.should_trigger(0.0, 0.7, 0.6, False, audio_available=True)
 
 
+def test_balanced_allows_horn_without_keyword_detector() -> None:
+    f = SignalFusion("balanced")
+    assert f.should_trigger(0.0, 0.7, 0.6, False, audio_available=True, keyword_available=False)
+
+
+def test_require_horn_and_keyword_overrides_other_signals() -> None:
+    f = SignalFusion("fast")
+    assert not f.should_trigger(
+        0.9, 0.7, 0.6, False, audio_available=True, require_horn_and_keyword=True
+    )
+    assert f.should_trigger(
+        0.1, 0.7, 0.6, True, audio_available=True, require_horn_and_keyword=True
+    )
+
+
 def test_accurate_requires_two_signals() -> None:
     f = SignalFusion("accurate")
     assert not f.should_trigger(0.8, 0.7, 0.0, False, audio_available=True)

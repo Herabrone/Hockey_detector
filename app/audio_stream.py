@@ -5,9 +5,10 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+import time
 from pathlib import Path
 from shutil import which
-from typing import Protocol
+from typing import Callable, Protocol
 
 import numpy as np
 
@@ -25,6 +26,7 @@ class AudioStream:
         sample_rate: int = 16000,
         chunk_duration: float = 0.5,
         input_format: str | None = None,
+        video_position_callback: Callable[[], float] | None = None,
     ) -> None:
         self.source = source
         self.sample_rate = sample_rate
@@ -33,10 +35,19 @@ class AudioStream:
         self.input_format = input_format
         self.is_file_source = self._detect_file_source(source, input_format)
         self._analyzers: list[AudioAnalyzer] = []
+        self._video_position_callback = video_position_callback
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self.active = False
         self.had_output = False
+        self.started_at: float | None = None
+        self.last_output_at: float | None = None
+        self.last_timestamp = 0.0
+        self.process_returncode: int | None = None
+        self.last_error: str = ""
+        self._stderr_lines: list[str] = []
+        self._warned_no_output = False
+        self._warned_stalled = False
 
     def register(self, analyzer: AudioAnalyzer) -> None:
         self._analyzers.append(analyzer)
@@ -55,9 +66,62 @@ class AudioStream:
             self._thread = None
         self.active = False
 
+    def seconds_since_start(self) -> float:
+        if self.started_at is None:
+            return 0.0
+        return max(0.0, time.time() - self.started_at)
+
+    def seconds_since_output(self) -> float | None:
+        if self.last_output_at is None:
+            return None
+        return max(0.0, time.time() - self.last_output_at)
+
+    def is_stalled(self, timeout_seconds: float) -> bool:
+        if not self.active or not self.had_output:
+            return False
+        since_output = self.seconds_since_output()
+        return since_output is not None and since_output > timeout_seconds
+
     def _emit(self, chunk: np.ndarray, timestamp: float) -> None:
         for analyzer in self._analyzers:
             analyzer.analyze(chunk, timestamp)
+
+    def _read_stderr(self, pipe) -> None:
+        if pipe is None:
+            return
+        try:
+            for raw_line in iter(pipe.readline, b""):
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                self._stderr_lines.append(line)
+                self._stderr_lines = self._stderr_lines[-20:]
+        finally:
+            pipe.close()
+
+    def _current_video_position(self) -> float | None:
+        if self._video_position_callback is None:
+            return None
+        try:
+            position = float(self._video_position_callback())
+        except Exception:
+            return None
+        return max(0.0, position)
+
+    def _chunk_timestamp(self, fallback_timestamp: float) -> float:
+        position = self._current_video_position()
+        if position is None:
+            return fallback_timestamp
+        self.last_timestamp = max(self.last_timestamp, position)
+        return self.last_timestamp
+
+    def _report_process_issue(self) -> None:
+        if self.process_returncode in (None, 0):
+            return
+        if self._stop_event.is_set():
+            return
+        details = self.last_error or "No ffmpeg stderr output captured."
+        print(f"Audio stream exited with code {self.process_returncode}: {details}")
 
     def _run_ffmpeg(self) -> None:
         """Extract audio from video file using ffmpeg subprocess."""
@@ -68,6 +132,9 @@ class AudioStream:
             return
 
         cmd = [ffmpeg_cmd]
+        if self.is_file_source:
+            # Pace file decoding to wall clock so callback-based timestamps stay aligned.
+            cmd.append("-re")
         if self.input_format:
             cmd += ["-f", self.input_format]
         cmd += [
@@ -85,7 +152,7 @@ class AudioStream:
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 startupinfo=startupinfo,
             )
         except Exception as exc:
@@ -93,8 +160,11 @@ class AudioStream:
             return
 
         self.active = True
+        self.started_at = time.time()
         bytes_per_chunk = self.chunk_samples * 4  # float32 = 4 bytes
-        timestamp = 0.0
+        fallback_timestamp = 0.0
+        stderr_thread = threading.Thread(target=self._read_stderr, args=(proc.stderr,), daemon=True)
+        stderr_thread.start()
 
         try:
             while not self._stop_event.is_set():
@@ -104,12 +174,19 @@ class AudioStream:
                 if not data:
                     break
                 self.had_output = True
+                self.last_output_at = time.time()
                 samples = np.frombuffer(data, dtype=np.float32)
+                timestamp = self._chunk_timestamp(fallback_timestamp)
                 self._emit(samples, timestamp)
-                timestamp += self.chunk_duration
+                fallback_timestamp += self.chunk_duration
         finally:
-            proc.terminate()
-            proc.wait()
+            if proc.poll() is None:
+                proc.terminate()
+            self.process_returncode = proc.wait()
+            stderr_thread.join(timeout=1)
+            if self._stderr_lines:
+                self.last_error = self._stderr_lines[-1]
+            self._report_process_issue()
             self.active = False
 
     @staticmethod

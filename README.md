@@ -18,7 +18,10 @@ Minimal implementation for detecting the broadcast `GOAL` overlay and triggering
 - `app/gate.py` - cooldown gate
 - `app/relay.py` - relay implementations
 - `config/config.yaml` - runtime settings
+- `config/test_game_vosk.yaml` - sample file config with Vosk path
 - `scripts/capture_template.py` - save ROI as template image
+- `scripts/validate_roi.py` - preview ROI and save a validation screenshot
+- `scripts/audio_test.py` - print audio pipeline confidence without the full app loop
 - `tests/test_gate.py` - cooldown tests
 
 ## Setup
@@ -61,6 +64,19 @@ If `assets/goal_template.png` exists, the app will print lines like:
 
 If you add optional team templates in `config/test_game.yaml`, the `team=` value will use the best matching team tag.
 
+## Keyword Detection With Vosk
+1. Install the optional dependency:
+```powershell
+pip install vosk
+```
+2. Download a small English Vosk model and extract it into `models/`.
+3. Set `audio.vosk_model_path` to that extracted folder, or use:
+```powershell
+python -m app.main --config config/test_game_vosk.yaml
+```
+
+If Vosk is not installed or the model path is wrong, the app logs a warning and keeps running. In `balanced` mode, horn-only audio can still contribute when keyword spotting is unavailable.
+
 ## Capture template
 1. Set `video_source` and `roi` in `config/config.yaml`.
 2. Run:
@@ -68,6 +84,33 @@ If you add optional team templates in `config/test_game.yaml`, the `team=` value
 python -m scripts.capture_template --config config/config.yaml --output assets/goal_template.png
 ```
 3. Press `s` when GOAL overlay is visible.
+
+## Validate ROI
+Use this to confirm the ROI covers the scoreboard area you expect:
+```powershell
+python -m scripts.validate_roi --config config/test_game.yaml
+```
+
+The script shows the full frame with the ROI box plus a cropped ROI window. Press `s` to save a preview screenshot or `q` to quit.
+
+## Audio Test Mode
+Use this to verify audio extraction and horn confidence independently of the full detector:
+```powershell
+python -m scripts.audio_test --config config/test_game.yaml
+```
+
+It prints whether audio samples are flowing and the current horn confidence over time.
+
+## Reference Horn Matching
+If you have a clean sample of your arena horn, you can point the detector at it:
+
+```yaml
+audio:
+  horn_reference_path: "assets/horn_sample.wav"
+  horn_reference_threshold: 0.85
+```
+
+When a reference clip is configured, horn detection compares incoming audio against that sample instead of only relying on the broad frequency band.
 
 ## Notes
 - For recorded-video tuning, set `video_source` to a file path.

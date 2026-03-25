@@ -31,11 +31,16 @@ class SignalFusion:
         horn_confidence: float,
         keyword_detected: bool,
         audio_available: bool = False,
+        keyword_available: bool = True,
+        require_horn_and_keyword: bool = False,
     ) -> bool:
         """Return True when the combined signals warrant a goal trigger."""
         # Small tolerance avoids UI rounding confusion, e.g. 0.6996 shown as 0.700.
         visual_hit = visual_score >= (visual_threshold - 0.001)
         horn_hit = horn_confidence >= 0.5
+
+        if require_horn_and_keyword:
+            return audio_available and horn_hit and keyword_detected
 
         # Without audio the only signal is visual, regardless of sensitivity.
         if not audio_available:
@@ -47,6 +52,8 @@ class SignalFusion:
         if self.sensitivity == self.BALANCED:
             if visual_hit:
                 return True
+            if not keyword_available:
+                return horn_hit
             if horn_hit and keyword_detected:
                 return True
             return False

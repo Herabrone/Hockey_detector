@@ -85,3 +85,36 @@ def test_unbounded_history_keeps_older_file_events() -> None:
         det.analyze(tone, i * 0.5)
 
     assert det.confidence_at(1.0) > 0.5
+
+
+def test_reference_profile_detects_matching_tone() -> None:
+    reference = _sine_wave(500, duration=0.5, sample_rate=16000)
+    reference_profile = HornDetector._normalized_spectrum(np.abs(np.fft.rfft(reference)))
+    det = HornDetector(
+        sample_rate=16000,
+        reference_profile=reference_profile,
+        reference_similarity_threshold=0.95,
+        sustain_seconds=0.5,
+        chunk_duration=0.5,
+    )
+
+    det.analyze(reference, 0.0)
+
+    assert det.confidence_at(0.0) > 0.5
+
+
+def test_reference_profile_rejects_different_tone() -> None:
+    reference = _sine_wave(500, duration=0.5, sample_rate=16000)
+    different = _sine_wave(900, duration=0.5, sample_rate=16000)
+    reference_profile = HornDetector._normalized_spectrum(np.abs(np.fft.rfft(reference)))
+    det = HornDetector(
+        sample_rate=16000,
+        reference_profile=reference_profile,
+        reference_similarity_threshold=0.95,
+        sustain_seconds=0.5,
+        chunk_duration=0.5,
+    )
+
+    det.analyze(different, 0.0)
+
+    assert det.confidence_at(0.0) == 0.0

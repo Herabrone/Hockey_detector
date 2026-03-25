@@ -1,12 +1,13 @@
 video_source: "assets/Game1.mp4"
 output_width: 640
 output_height: 360
-threshold: 0.70
+threshold: 0.40
 cooldown_seconds: 10.0
 show_window: true
 show_roi_box: true
 template_path: assets/goal_template.png
 sensitivity: balanced
+require_horn_and_keyword: true
 
 relay_mode: print
 serial_port: COM3
@@ -19,9 +20,9 @@ team_templates:
 
 roi:
   y1: 0
-  y2: 150
+  y2: 110
   x1: 0
-  x2: -1
+  x2: 260
 
 audio:
   enabled: true
@@ -29,8 +30,10 @@ audio:
   input_format: ""
   horn_freq_low: 200
   horn_freq_high: 1000
-  horn_energy_threshold: 0.4
+  horn_energy_threshold: 0.40
+  horn_reference_path: ""
+  horn_reference_threshold: 0.85
   horn_sustain_seconds: 1.0
   sample_rate: 16000
   chunk_duration: 0.5
-  vosk_model_path: ""
+  vosk_model_path: "assets/vosk-model-small-en-us-0.15"
