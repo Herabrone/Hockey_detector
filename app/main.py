@@ -45,6 +45,12 @@ def _setup_audio(cfg: AppConfig):
     from app.audio_stream import AudioStream
     from app.horn_detector import HornDetector
 
+    audio_source = cfg.audio.source or cfg.video_source
+    preserve_audio_history = AudioStream._detect_file_source(
+        audio_source,
+        cfg.audio.input_format or None,
+    )
+
     horn = HornDetector(
         sample_rate=cfg.audio.sample_rate,
         freq_low=cfg.audio.horn_freq_low,
@@ -52,10 +58,11 @@ def _setup_audio(cfg: AppConfig):
         energy_threshold=cfg.audio.horn_energy_threshold,
         sustain_seconds=cfg.audio.horn_sustain_seconds,
         chunk_duration=cfg.audio.chunk_duration,
+        max_history=None if preserve_audio_history else 120,
     )
 
     audio = AudioStream(
-        source=cfg.audio.source or cfg.video_source,
+        source=audio_source,
         sample_rate=cfg.audio.sample_rate,
         chunk_duration=cfg.audio.chunk_duration,
         input_format=cfg.audio.input_format or None,
@@ -69,10 +76,16 @@ def _setup_audio(cfg: AppConfig):
         kw = KeywordDetector(
             model_path=cfg.audio.vosk_model_path,
             sample_rate=cfg.audio.sample_rate,
+            max_history=None if preserve_audio_history else 60,
         )
         if kw.available:
             audio.register(kw)
             keyword = kw
+            print("Keyword spotting enabled.")
+        else:
+            print("Keyword spotting unavailable (check vosk install/model path).")
+    else:
+        print("Keyword spotting disabled (audio.vosk_model_path is empty).")
 
     audio.start()
     print("Audio detection started.")
@@ -92,13 +105,12 @@ def run(cfg: AppConfig) -> None:
         print(f"Template missing: {template_path}. Visual detection disabled.")
 
     audio, horn, keyword = _setup_audio(cfg)
-    audio_on = audio is not None
 
     fusion = SignalFusion(cfg.sensitivity)
     gate = CooldownGate(cfg.cooldown_seconds)
     relay = _build_relay(cfg)
 
-    print(f"Sensitivity: {cfg.sensitivity} | Audio: {'on' if audio_on else 'off'}")
+    print(f"Sensitivity: {cfg.sensitivity} | Audio: {'on' if (audio and audio.active) else 'off'}")
     print("Press ESC or q to quit.")
 
     try:
@@ -113,6 +125,7 @@ def run(cfg: AppConfig) -> None:
             roi = frame[y1:y2, x1:x2]
 
             video_ts = source.timestamp()
+            audio_on = bool(audio and (audio.active or (audio.is_file_source and audio.had_output)))
 
             visual_score = detector.score(roi) if detector else 0.0
             horn_conf = horn.confidence_at(video_ts) if horn else 0.0
@@ -123,7 +136,7 @@ def run(cfg: AppConfig) -> None:
                 if gate.can_trigger():
                     if detector is not None:
                         team_name = detector.detect_team(roi)
-                    parts = [f"team={team_name}", f"visual={visual_score:.3f}"]
+                    parts = [f"team={team_name}", f"visual={visual_score:.4f}"]
                     if audio_on:
                         parts += [f"horn={horn_conf:.2f}", f"kw={kw_hit}"]
                     print(f"[GOAL] {' '.join(parts)} | {time.strftime('%H:%M:%S')}")
@@ -134,7 +147,7 @@ def run(cfg: AppConfig) -> None:
                 display = frame.copy()
                 if cfg.show_roi_box:
                     cv2.rectangle(display, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                info = f"v={visual_score:.3f} thr={cfg.threshold:.2f}"
+                info = f"v={visual_score:.4f} thr={cfg.threshold:.3f}"
                 if audio_on:
                     info += f" horn={horn_conf:.2f} kw={'Y' if kw_hit else 'N'}"
                 info += f" [{cfg.sensitivity}]"
@@ -199,12 +212,6 @@ def main() -> None:
 
     if args.audio is not None:
         cfg.audio.enabled = args.audio
-
-    run(cfg)
-
-
-if __name__ == "__main__":
-    main()
 
     run(cfg)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 import threading
+from pathlib import Path
 from shutil import which
 from typing import Protocol
 
@@ -30,10 +31,12 @@ class AudioStream:
         self.chunk_samples = int(sample_rate * chunk_duration)
         self.chunk_duration = chunk_duration
         self.input_format = input_format
+        self.is_file_source = self._detect_file_source(source, input_format)
         self._analyzers: list[AudioAnalyzer] = []
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
         self.active = False
+        self.had_output = False
 
     def register(self, analyzer: AudioAnalyzer) -> None:
         self._analyzers.append(analyzer)
@@ -100,6 +103,7 @@ class AudioStream:
                 data = proc.stdout.read(bytes_per_chunk)
                 if not data:
                     break
+                self.had_output = True
                 samples = np.frombuffer(data, dtype=np.float32)
                 self._emit(samples, timestamp)
                 timestamp += self.chunk_duration
@@ -121,3 +125,12 @@ class AudioStream:
             return imageio_ffmpeg.get_ffmpeg_exe()
         except Exception:
             return None
+
+    @staticmethod
+    def _detect_file_source(source: str, input_format: str | None) -> bool:
+        """Best-effort check for regular media files such as MP4."""
+        if input_format:
+            return False
+        if source.isdigit():
+            return False
+        return Path(source).exists()

@@ -22,12 +22,13 @@ class KeywordDetector:
         model_path: str,
         sample_rate: int = 16000,
         keywords: set[str] | None = None,
+        max_history: int | None = 60,
     ) -> None:
         self.keywords = keywords or _DEFAULT_KEYWORDS
         self.sample_rate = sample_rate
         self._lock = threading.Lock()
         self._events: list[tuple[float, str]] = []  # (timestamp, matched text)
-        self._max_history = 60
+        self._max_history = max_history
         self._recognizer = None
 
         try:
@@ -65,7 +66,7 @@ class KeywordDetector:
         if any(kw in text for kw in self.keywords):
             with self._lock:
                 self._events.append((timestamp, text))
-                if len(self._events) > self._max_history:
+                if self._max_history is not None and len(self._events) > self._max_history:
                     self._events = self._events[-self._max_history:]
 
     # ------------------------------------------------------------------

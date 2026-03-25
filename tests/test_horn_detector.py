@@ -67,3 +67,21 @@ def test_last_confidence_reflects_recent_chunks() -> None:
     det.analyze(tone, 1.0)
 
     assert det.last_confidence > 0.5
+
+
+def test_unbounded_history_keeps_older_file_events() -> None:
+    det = HornDetector(
+        sample_rate=16000,
+        freq_low=200,
+        freq_high=1000,
+        energy_threshold=0.3,
+        sustain_seconds=0.5,
+        chunk_duration=0.5,
+        max_history=None,
+    )
+
+    tone = _sine_wave(400, duration=0.5, sample_rate=16000)
+    for i in range(200):
+        det.analyze(tone, i * 0.5)
+
+    assert det.confidence_at(1.0) > 0.5

@@ -33,7 +33,8 @@ class SignalFusion:
         audio_available: bool = False,
     ) -> bool:
         """Return True when the combined signals warrant a goal trigger."""
-        visual_hit = visual_score >= visual_threshold
+        # Small tolerance avoids UI rounding confusion, e.g. 0.6996 shown as 0.700.
+        visual_hit = visual_score >= (visual_threshold - 0.001)
         horn_hit = horn_confidence >= 0.5
 
         # Without audio the only signal is visual, regardless of sensitivity.

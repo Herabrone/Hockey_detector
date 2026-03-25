@@ -23,6 +23,7 @@ class HornDetector:
         energy_threshold: float = 0.4,
         sustain_seconds: float = 1.0,
         chunk_duration: float = 0.5,
+        max_history: int | None = 120,
     ) -> None:
         self.sample_rate = sample_rate
         self.freq_low = freq_low
@@ -31,7 +32,7 @@ class HornDetector:
         self.sustain_chunks = max(1, int(sustain_seconds / chunk_duration))
         self._lock = threading.Lock()
         self._events: list[tuple[float, float]] = []  # (timestamp, ratio)
-        self._max_history = 120  # ~60 s at 0.5 s chunks
+        self._max_history = max_history
 
     # ------------------------------------------------------------------
     # Called from the audio thread
@@ -53,7 +54,7 @@ class HornDetector:
 
         with self._lock:
             self._events.append((timestamp, ratio))
-            if len(self._events) > self._max_history:
+            if self._max_history is not None and len(self._events) > self._max_history:
                 self._events = self._events[-self._max_history:]
 
     # ------------------------------------------------------------------

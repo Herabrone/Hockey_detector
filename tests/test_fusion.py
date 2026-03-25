@@ -49,6 +49,12 @@ def test_no_audio_falls_back_to_visual() -> None:
         assert not f.should_trigger(0.5, 0.7, 0.0, False, audio_available=False)
 
 
+def test_visual_tolerance_handles_rounding_edge() -> None:
+    f = SignalFusion("balanced")
+    # Value might display as 0.700 in UI while being slightly below threshold.
+    assert f.should_trigger(0.6996, 0.7, 0.0, False, audio_available=True)
+
+
 def test_invalid_sensitivity_raises() -> None:
     with pytest.raises(ValueError):
         SignalFusion("turbo")
